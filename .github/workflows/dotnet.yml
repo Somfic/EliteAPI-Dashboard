@@ -8,11 +8,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-
-    runs-on: ${{os}}
+    runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v3
