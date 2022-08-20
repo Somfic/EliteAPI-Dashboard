@@ -45,7 +45,15 @@
         "digestAlgorithm": "sha256",
         "timestampUrl": ""
       },
-      "externalBin": ["bin/eliteapi"]
+      "externalBin": ["bin/eliteapi/eliteapi"]
+    },
+    "allowlist": {
+      "shell": {
+        "sidecar": true,
+        "scope": [
+            { "name": "bin/eliteapi/eliteapi", "sidecar": true }
+        ]
+      }
     },
     "security": {
       "csp": null

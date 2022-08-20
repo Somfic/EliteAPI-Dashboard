@@ -9,9 +9,14 @@ async function main() {
     console.error("Failed to determine platform target triple");
   }
 
+  let extension = ''
+  if (process.platform === 'win32') {
+    extension = '.exe'
+  }
+
   renameSync(
-    path.join(process.cwd(), "src-tauri", "bin", "eliteapi"),
-    path.join(process.cwd(), "src-tauri", "bin", `eliteapi-${targetTriple}`)
+    path.join(process.cwd(), "src-tauri", "bin", "eliteapi", `EliteAPI.Server${extension}`),
+    path.join(process.cwd(), "src-tauri", "bin", "eliteapi", `eliteapi-${targetTriple}${extension}`)
   );
 }
 

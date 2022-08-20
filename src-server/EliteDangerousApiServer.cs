@@ -32,8 +32,8 @@ public class EliteDangerousApiServer
     {
         backlog.Add(e);
 
-        var paths = _api.Parser.ToPaths(e);
-        var payload = new EventPaths(paths);
+        var paths =  new EventPaths(_api.Parser.ToPaths(e));
+        var payload = new Payload(paths, context);
 
         foreach (var client in _clients.Where(x => x.IsOpen && x.IsAccepted && x.IsAvailable))
         {
