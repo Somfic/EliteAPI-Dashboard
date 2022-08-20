@@ -8,10 +8,11 @@ on:
 
 jobs:
   build:
-    runs-on: ${{os}}
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
+
+    runs-on: ${{os}}
 
     steps:
     - uses: actions/checkout@v3
