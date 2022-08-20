@@ -1,10 +1,13 @@
 {
-  "name": "Dashboard",
+  "name": "eliteapi.dashboard",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
+    "prebuild": "dotnet publish src-server -c Release -o src-tauri/bin/eliteapi",
+    "postbuild": "node --experimental-modules scripts/rename-arch.js",
     "build": "rollup -c",
-    "dev": "rollup -c -w",
+    "dev": "rollup -c -w & dotnet watch --project src-server",
     "start": "sirv public --no-clear",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri"
@@ -15,9 +18,11 @@
     "@rollup/plugin-typescript": "^8.0.0",
     "@tauri-apps/cli": "^1.0.5",
     "@tsconfig/svelte": "^2.0.0",
+    "execa": "^6.1.0",
     "rollup": "^2.3.4",
     "rollup-plugin-css-only": "^3.1.0",
     "rollup-plugin-livereload": "^2.0.0",
+    "rollup-plugin-serve": "^2.0.1",
     "rollup-plugin-svelte": "^7.0.0",
     "rollup-plugin-terser": "^7.0.0",
     "svelte": "^3.0.0",
@@ -28,6 +33,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^1.0.2",
+    "download-github-release": "^0.3.2",
     "sirv-cli": "^2.0.0"
   }
 }

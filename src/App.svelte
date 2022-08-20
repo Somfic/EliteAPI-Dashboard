@@ -1,5 +1,12 @@
 <script lang="ts">
+	import { onMount} from "svelte";
+	import { connect } from "./api/websocket";
+
 	export let name: string;
+
+	onMount(() => {
+		connect();
+	});
 </script>
 
 <main>
