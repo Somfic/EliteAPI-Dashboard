@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { onMount} from "svelte";
 	import { connect } from "./api/websocket";
+	import { onmessage } from "./api/communication";
 
 	export let name: string;
 
 	onMount(() => {
 		connect();
+
+		//onmessage(msg => console.warn(msg));
 	});
 </script>
 
