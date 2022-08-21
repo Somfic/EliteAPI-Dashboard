@@ -12,7 +12,7 @@ export function connect() {
   };
 
   socket.onmessage = (message) => {
-    console.log("Incoming WebSocket message", message.data);
+    console.log("Incoming WebSocket message", JSON.parse(message.data));
   };
 
   socket.onerror = (error) => {
