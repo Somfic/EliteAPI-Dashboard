@@ -4,8 +4,9 @@ using EliteAPI.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using EliteAPI.Abstractions.Events;
+using EliteAPI.Server.Payloads;
+using EliteAPI.Server.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 
 namespace EliteAPI.Server;
 
@@ -15,7 +16,6 @@ public class EliteDangerousApiServer
     private readonly ILogger<EliteDangerousApiServer>? _log;
     private readonly IEliteDangerousApi _api;
     private readonly IConfiguration _config;
-    private readonly IList<IEvent> backlog = new List<IEvent>();
     public bool IsRunning { get; private set; }
 
     public EliteDangerousApiServer(IServiceProvider services)
@@ -27,20 +27,6 @@ public class EliteDangerousApiServer
 
         _api.Events.OnAny(OnAny);
     }
-
-    private async Task OnAny(IEvent e, EventContext context)
-    {
-        backlog.Add(e);
-
-        var paths =  new EventPaths(_api.Parser.ToPaths(e));
-        var payload = new Payload(paths, context);
-
-        foreach (var client in _clients.Where(x => x.IsOpen && x.IsAccepted && x.IsAvailable))
-        {
-            await client.WriteAsync(JsonConvert.SerializeObject(payload));
-        }
-    }
-
 
     private readonly List<Client> _clients = new();
     private readonly List<Task> _clientTasks = new();
@@ -76,6 +62,8 @@ public class EliteDangerousApiServer
                 var client = ActivatorUtilities.CreateInstance<Client>(_services, tcp);
                 _clients.Add(client);
                 _clientTasks.Add(Task.Run(async () => await client.Handle()));
+
+                await Task.Delay(500);
             }
         });
 
@@ -96,5 +84,24 @@ public class EliteDangerousApiServer
         await _mainTask;
 
         _log?.LogInformation("Stopped EliteAPI Server");
+    }
+
+    private async Task OnAny(IEvent e, EventContext context)
+    {
+        await WriteAsync(MessageType.Event, new EventPayload(e, context));
+        await WriteAsync(MessageType.Paths, new PathsPayload(_api.Parser.ToPaths(e).ToList(), context));
+    }
+    
+    private readonly IList<(MessageType type, object payload)> backlog = new List<(MessageType type, object payload)>();
+    
+    private async Task WriteAsync(MessageType type, object payload)
+    {
+        backlog.Add((type, payload));
+        
+        var message = new WebSocketMessage(type, payload);
+        foreach (var client in _clients.Where(x => x.IsOpen && x.IsAccepted && x.IsAvailable))
+        {
+            await client.WriteAsync(message);
+        }
     }
 }

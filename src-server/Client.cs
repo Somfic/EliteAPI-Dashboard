@@ -2,6 +2,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using EliteAPI.Server.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -67,6 +68,8 @@ public class Client
                     _log?.LogWarning("Unhandled incoming {Type}", incoming.Type);
                     break;
             }
+
+            await Task.Delay(500);
         }
 
         _log?.LogInformation("Client {Id} disconnected", _id);
@@ -87,9 +90,12 @@ public class Client
     /// Reads a line from the client.
     /// </summary>
     /// <returns></returns>
-    public async Task<WebSocketMessage> ReadAsync()
+    public async Task<RawWebSocketMessage> ReadAsync()
     {
-        while (!_tcp.GetStream().DataAvailable) ;
+        while (!_tcp.GetStream().DataAvailable)
+        {
+            await Task.Delay(500);
+        };
 
         if (!IsAccepted)
         {
@@ -99,7 +105,7 @@ public class Client
             await _stream.ReadAsync(bytes.AsMemory(0, _tcp.Available));
             var payload = Encoding.UTF8.GetString(bytes);
 
-            return new WebSocketMessage(Opcode.Handshake, payload);
+            return new RawWebSocketMessage(Opcode.Handshake, payload);
         }
         else
         {
@@ -111,7 +117,7 @@ public class Client
             var op = (Opcode) (byte) (bytes[0] & 0b00001111);
 
             if (op != Opcode.TextFrame)
-                return new WebSocketMessage(op);
+                return new RawWebSocketMessage(op);
 
             var secondByte = bytes[1];
             var dataLength = secondByte & 127;
@@ -133,7 +139,7 @@ public class Client
 
             var payload = Encoding.UTF8.GetString(decoded, 0, decoded.Length);
 
-            return new WebSocketMessage(op, payload);
+            return new RawWebSocketMessage(op, payload);
         }
     }
 
@@ -141,10 +147,17 @@ public class Client
     /// Writes a line to the client.
     /// </summary>
     /// <param name="line"></param>
-    public async Task WriteAsync(string? line)
+    public async Task WriteAsync(WebSocketMessage message)
     {
+        var line = Newtonsoft.Json.JsonConvert.SerializeObject(message);
+
+        if(message.Type == MessageType.Handshake)
+            line = message.Payload.ToString();
+
         if (line == null)
             return;
+        
+        _log?.LogInformation("Outgoing {Type}:{Payload}", message.Type, line);
 
         var bytes = Encoding.UTF8.GetBytes(line);
 
@@ -189,12 +202,12 @@ public class Client
         }
     }
     
-    private async Task AcceptHandshakeAsync(WebSocketMessage incoming)
+    private async Task AcceptHandshakeAsync(RawWebSocketMessage incoming)
     {
         if (Regex.IsMatch(incoming.Payload, "^GET", RegexOptions.IgnoreCase))
         {
             var handshake = await GetHandshake(incoming.Payload);
-            await WriteAsync(handshake);
+            await WriteAsync(new WebSocketMessage(MessageType.Handshake, handshake));
             _log?.LogInformation("Client {Id} connected", _id);
             IsAccepted = true;
         }
