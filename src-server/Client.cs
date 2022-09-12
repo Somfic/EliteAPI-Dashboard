@@ -5,230 +5,244 @@ using System.Text.RegularExpressions;
 using EliteAPI.Server.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using EliteAPI.Abstractions;
+using Newtonsoft.Json;
 
 namespace EliteAPI.Server;
 
 public class Client
 {
-    private readonly TcpClient _tcp;
-    private readonly Guid _id;
+	private readonly TcpClient _tcp;
+	private readonly Guid _id;
 
-    /// <summary>
-    /// Whether the client has been authenticated.
-    /// </summary>
-    public bool IsAccepted { get; private set; }
-    
-    /// <summary>
-    /// Whether the client is connected.
-    /// </summary>
-    public bool IsOpen { get; private set; }
+	/// <summary>
+	/// Whether the client has been authenticated.
+	/// </summary>
+	public bool IsAccepted { get; private set; }
 
-    public bool IsAvailable => _tcp.Connected;
+	/// <summary>
+	/// Whether the client is connected.
+	/// </summary>
+	public bool IsOpen { get; private set; }
 
-    private readonly NetworkStream _stream;
-    private readonly ILogger<Client>? _log;
+	public bool IsAvailable => _tcp.Connected;
 
-    public Client(IServiceProvider services, TcpClient tcp)
-    {
-        _tcp = tcp;
-        _id = Guid.NewGuid();
-        IsOpen = tcp.Connected;
-        _stream = tcp.GetStream();
+	private readonly NetworkStream _stream;
+	private readonly ILogger<Client>? _log;
 
-        _log = services.GetService<ILogger<Client>>();
-    }
+	private readonly IEliteDangerousApi _api;
 
-    public async Task Handle()
-    {
-        while (IsOpen)
-        {
-            if(!IsAccepted)
-                _log?.LogDebug("Awaiting handshake from client {Id}", _id);
+	public Client(IServiceProvider services, TcpClient tcp)
+	{
+		_tcp = tcp;
+		_id = Guid.NewGuid();
+		IsOpen = tcp.Connected;
+		_stream = tcp.GetStream();
 
-            var incoming = await ReadAsync();
+		_log = services.GetService<ILogger<Client>>();
+		_api = services.GetRequiredService<IEliteDangerousApi>();
+	}
 
-            _log?.LogTrace("Incoming {Type}" + (string.IsNullOrEmpty(incoming.Payload) ? "" : ": ") + "{Payload}", incoming.Type, incoming.Payload);
-            
-            switch (incoming.Type)
-            {
-                case Opcode.Handshake:
-                    await AcceptHandshakeAsync(incoming);
-                    break;
+	public async Task Handle(IList<(MessageType type, object payload)> backlog)
+	{
+		while (IsOpen)
+		{
+			if (!IsAccepted)
+				_log?.LogDebug("Awaiting handshake from client {Id}", _id);
 
-                case Opcode.TextFrame:
-                    //_log?.LogDebug("Incoming TextFrame: {Payload}", incoming.Payload);
-                    //todo: send set variables to frontend
-                    break;
-                
-                case Opcode.ConnectionClose:
-                    await CloseAsync();
-                    break;
+			var incoming = await ReadAsync();
 
-                default:
-                    _log?.LogWarning("Unhandled incoming {Type}", incoming.Type);
-                    break;
-            }
+			_log?.LogTrace("Incoming {Type}" + (string.IsNullOrEmpty(incoming.Payload) ? "" : ": ") + "{Payload}", incoming.Type, incoming.Payload);
 
-            await Task.Delay(500);
-        }
+			switch (incoming.Type)
+			{
+				case Opcode.Handshake:
+					await AcceptHandshakeAsync(incoming);
+					_log?.LogInformation("Sending backlog to client {Id} ({Count} items)", _id, backlog.Count);
+					await WriteAsync(new WebSocketMessage(MessageType.Backlog, backlog.Select(x => x.payload)));
+					break;
 
-        _log?.LogInformation("Client {Id} disconnected", _id);
-    }
+				case Opcode.TextFrame:
+					_log?.LogInformation("Incoming TextFrame: {Payload}", incoming.Payload);
+					//todo: send set variables to frontend
+					break;
 
-    /// <summary>
-    /// Closes the connection.
-    /// </summary>
-    public async Task CloseAsync()
-    {
-        _log?.LogDebug("Closing client {Id}", _id);
-        IsOpen = false;
-        IsAccepted = false;
-        _tcp.Close();
-    }
-        
-    /// <summary>
-    /// Reads a line from the client.
-    /// </summary>
-    /// <returns></returns>
-    public async Task<RawWebSocketMessage> ReadAsync()
-    {
-        while (!_tcp.GetStream().DataAvailable)
-        {
-            await Task.Delay(500);
-        };
+				case Opcode.ConnectionClose:
+					await CloseAsync();
+					break;
 
-        if (!IsAccepted)
-        {
-            while (_tcp.Available < 3) ;
+				default:
+					_log?.LogWarning("Unhandled incoming {Type}", incoming.Type);
+					break;
+			}
 
-            var bytes = new byte[_tcp.Available];
-            await _stream.ReadAsync(bytes.AsMemory(0, _tcp.Available));
-            var payload = Encoding.UTF8.GetString(bytes);
+			await Task.Delay(500);
+		}
 
-            return new RawWebSocketMessage(Opcode.Handshake, payload);
-        }
-        else
-        {
-            var bytes = new byte[_tcp.Available];
+		_log?.LogInformation("Client {Id} disconnected", _id);
+	}
 
-            await _stream.ReadAsync(bytes.AsMemory(0, _tcp.Available));
+	/// <summary>
+	/// Closes the connection.
+	/// </summary>
+	public async Task CloseAsync()
+	{
+		_log?.LogDebug("Closing client {Id}", _id);
+		IsOpen = false;
+		IsAccepted = false;
+		_tcp.Close();
+	}
 
-            // Convert opcode to enum
-            var op = (Opcode) (byte) (bytes[0] & 0b00001111);
+	/// <summary>
+	/// Reads a line from the client.
+	/// </summary>
+	/// <returns></returns>
+	public async Task<RawWebSocketMessage> ReadAsync()
+	{
+		while (!_tcp.GetStream().DataAvailable)
+		{
+			await Task.Delay(500);
+		};
 
-            if (op != Opcode.TextFrame)
-                return new RawWebSocketMessage(op);
+		if (!IsAccepted)
+		{
+			while (_tcp.Available < 3) ;
 
-            var secondByte = bytes[1];
-            var dataLength = secondByte & 127;
-            var indexFirstMask = dataLength switch
-            {
-                126 => 4,
-                127 => 10,
-                _ => 2
-            };
+			var bytes = new byte[_tcp.Available];
+			await _stream.ReadAsync(bytes.AsMemory(0, _tcp.Available));
+			var payload = Encoding.UTF8.GetString(bytes);
 
-            var keys = bytes.Skip(indexFirstMask).Take(4).ToArray();
-            var indexFirstDataByte = indexFirstMask + 4;
+			return new RawWebSocketMessage(Opcode.Handshake, payload);
+		}
+		else
+		{
+			var bytes = new byte[_tcp.Available];
 
-            var decoded = new byte[bytes.Length - indexFirstDataByte];
-            for (int i = indexFirstDataByte, j = 0; i < bytes.Length; i++, j++)
-            {
-                decoded[j] = (byte) (bytes[i] ^ keys.ElementAt(j % 4));
-            }
+			await _stream.ReadAsync(bytes.AsMemory(0, _tcp.Available));
 
-            var payload = Encoding.UTF8.GetString(decoded, 0, decoded.Length);
+			// Convert opcode to enum
+			var op = (Opcode)(byte)(bytes[0] & 0b00001111);
 
-            return new RawWebSocketMessage(op, payload);
-        }
-    }
+			if (op != Opcode.TextFrame)
+				return new RawWebSocketMessage(op);
 
-    /// <summary>
-    /// Writes a line to the client.
-    /// </summary>
-    /// <param name="line"></param>
-    public async Task WriteAsync(WebSocketMessage message)
-    {
-        var line = Newtonsoft.Json.JsonConvert.SerializeObject(message);
+			var secondByte = bytes[1];
+			var dataLength = secondByte & 127;
+			var indexFirstMask = dataLength switch
+			{
+				126 => 4,
+				127 => 10,
+				_ => 2
+			};
 
-        if(message.Type == MessageType.Handshake)
-            line = message.Payload.ToString();
+			var keys = bytes.Skip(indexFirstMask).Take(4).ToArray();
+			var indexFirstDataByte = indexFirstMask + 4;
 
-        if (line == null)
-            return;
-        
-        _log?.LogInformation("Outgoing {Type}:{Payload}", message.Type, line);
+			var decoded = new byte[bytes.Length - indexFirstDataByte];
+			for (int i = indexFirstDataByte, j = 0; i < bytes.Length; i++, j++)
+			{
+				decoded[j] = (byte)(bytes[i] ^ keys.ElementAt(j % 4));
+			}
 
-        var bytes = Encoding.UTF8.GetBytes(line);
+			var payload = Encoding.UTF8.GetString(decoded, 0, decoded.Length);
 
-        await WriteAsync(bytes);
-    }
+			return new RawWebSocketMessage(op, payload);
+		}
+	}
 
-    /// <summary>
-    /// Writes bytes to the client.
-    /// </summary>
-    /// <param name="bytes"></param>
-    public async Task WriteAsync(byte[] bytes)
-    {
-        if (!IsAccepted)
-        {
-            await _stream.WriteAsync(bytes);
-            await _stream.FlushAsync();
-        }
-        else
-        {
-            const int frameSize = 64;
-            
-            var parts = bytes.Select((b, i) => new {b, i})
-                .GroupBy(x => x.i / (frameSize - 1))
-                .Select(x => x.Select(y => y.b).ToArray())
-                .ToList();
+	/// <summary>
+	/// Writes a line to the client.
+	/// </summary>
+	/// <param name="line"></param>
+	public async Task WriteAsync(WebSocketMessage message)
+	{
+		try
+		{
+			var line = JsonConvert.SerializeObject(message);
 
-            for (var i = 0; i < parts.Count; i++)
-            {
-                byte cmd = 0;
-                if (i == 0) cmd |= 1;
-                if (i == parts.Count - 1) cmd |= 0x80;
+			if (message.Type == MessageType.Handshake)
+				line = message.Payload.ToString();
 
-                _stream.WriteByte(cmd);
-                _stream.WriteByte((byte) parts[i].Length);
-                _log?.LogTrace("Sending bytes: {Bytes}", string.Join(" ", parts[i].AsMemory(0, parts[i].Length).ToArray()));
+			if (line == null)
+				return;
 
-                
-                await _stream.WriteAsync(parts[i].AsMemory(0, parts[i].Length));
-            }
+			_log?.LogTrace("Outgoing {Type}:{Payload}", message.Type, line);
 
-            await _stream.FlushAsync();
-        }
-    }
-    
-    private async Task AcceptHandshakeAsync(RawWebSocketMessage incoming)
-    {
-        if (Regex.IsMatch(incoming.Payload, "^GET", RegexOptions.IgnoreCase))
-        {
-            var handshake = await GetHandshake(incoming.Payload);
-            await WriteAsync(new WebSocketMessage(MessageType.Handshake, handshake));
-            _log?.LogInformation("Client {Id} connected", _id);
-            IsAccepted = true;
-        }
-    }
-        
-    private static async Task<string> GetHandshake(string handshake)
-    {
-        const string eol = "\r\n";
-        const string guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+			var bytes = Encoding.UTF8.GetBytes(line);
 
-        var key = Regex.Match(handshake, "Sec-WebSocket-Key: (.*)").Groups[1].Value.Trim();
-        var rfcKey = key + guid;
-        var hash = SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(rfcKey));
-        var base64 = Convert.ToBase64String(hash);
+			await WriteAsync(bytes);
+		}
+		catch (Exception ex)
+		{
+			_log?.LogWarning(ex, "Could not write to client");
+		}
+	}
 
-        var result = new StringWriter();
-        await result.WriteAsync($"HTTP/1.1 101 Switching Protocols{eol}");
-        await result.WriteAsync($"Connection: Upgrade{eol}");
-        await result.WriteAsync($"Sec-WebSocket-Accept: {base64}{eol}");
-        await result.WriteAsync($"Upgrade: websocket{eol}{eol}");
+	/// <summary>
+	/// Writes bytes to the client.
+	/// </summary>
+	/// <param name="bytes"></param>
+	public async Task WriteAsync(byte[] bytes)
+	{
+		if (!IsAccepted)
+		{
+			await _stream.WriteAsync(bytes);
+			await _stream.FlushAsync();
+		}
+		else
+		{
+			const int frameSize = 64;
 
-        return result.ToString();
-    }
+			var parts = bytes.Select((b, i) => new { b, i })
+				.GroupBy(x => x.i / (frameSize - 1))
+				.Select(x => x.Select(y => y.b).ToArray())
+				.ToList();
+
+			for (var i = 0; i < parts.Count; i++)
+			{
+				byte cmd = 0;
+				if (i == 0) cmd |= 1;
+				if (i == parts.Count - 1) cmd |= 0x80;
+
+				_stream.WriteByte(cmd);
+				_stream.WriteByte((byte)parts[i].Length);
+				_log?.LogTrace("Sending bytes: {Bytes}", string.Join(" ", parts[i].AsMemory(0, parts[i].Length).ToArray()));
+
+
+				await _stream.WriteAsync(parts[i].AsMemory(0, parts[i].Length));
+			}
+
+			await _stream.FlushAsync();
+		}
+	}
+
+	private async Task AcceptHandshakeAsync(RawWebSocketMessage incoming)
+	{
+		if (Regex.IsMatch(incoming.Payload, "^GET", RegexOptions.IgnoreCase))
+		{
+			var handshake = await GetHandshake(incoming.Payload);
+			await WriteAsync(new WebSocketMessage(MessageType.Handshake, handshake));
+			_log?.LogInformation("Client {Id} connected", _id);
+			IsAccepted = true;
+		}
+	}
+
+	private static async Task<string> GetHandshake(string handshake)
+	{
+		const string eol = "\r\n";
+		const string guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+		var key = Regex.Match(handshake, "Sec-WebSocket-Key: (.*)").Groups[1].Value.Trim();
+		var rfcKey = key + guid;
+		var hash = SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(rfcKey));
+		var base64 = Convert.ToBase64String(hash);
+
+		var result = new StringWriter();
+		await result.WriteAsync($"HTTP/1.1 101 Switching Protocols{eol}");
+		await result.WriteAsync($"Connection: Upgrade{eol}");
+		await result.WriteAsync($"Sec-WebSocket-Accept: {base64}{eol}");
+		await result.WriteAsync($"Upgrade: websocket{eol}{eol}");
+
+		return result.ToString();
+	}
 }

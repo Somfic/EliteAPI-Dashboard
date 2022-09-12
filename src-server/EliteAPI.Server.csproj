@@ -16,7 +16,7 @@
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0-preview.5.22301.12" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.0-preview.5.22301.12" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.2-beta1" />
-        <PackageReference Include="EliteAPI" Version="3.0.0-alpha5212" />
+        <PackageReference Include="EliteAPI" Version="3.0.0-alpha5225" />
     </ItemGroup>
 
 </Project>

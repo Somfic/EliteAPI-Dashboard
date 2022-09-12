@@ -7,6 +7,7 @@ using EliteAPI.Abstractions.Events;
 using EliteAPI.Server.Payloads;
 using EliteAPI.Server.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 
 namespace EliteAPI.Server;
 
@@ -32,7 +33,7 @@ public class EliteDangerousApiServer
     private readonly List<Task> _clientTasks = new();
     private Task _mainTask;
 
-    public Task StartAsync(int port)
+    public Task<EliteDangerousApiServer> StartAsync(int port)
     {
         var host = _config.GetValue("EliteAPI:Host", "127.0.0.1");
         if (!IPAddress.TryParse(host, out var hostIp))
@@ -61,13 +62,13 @@ public class EliteDangerousApiServer
                 var tcp = await listener.AcceptTcpClientAsync();
                 var client = ActivatorUtilities.CreateInstance<Client>(_services, tcp);
                 _clients.Add(client);
-                _clientTasks.Add(Task.Run(async () => await client.Handle()));
+                _clientTasks.Add(Task.Run(async () => await client.Handle(_backlog)));
 
                 await Task.Delay(500);
             }
         });
 
-        return Task.CompletedTask;
+        return Task.FromResult(this);
     }
 
     public async Task StopAsync()
@@ -88,15 +89,16 @@ public class EliteDangerousApiServer
 
     private async Task OnAny(IEvent e, EventContext context)
     {
+        _log?.LogInformation(JsonConvert.SerializeObject(e));
         await WriteAsync(MessageType.Event, new EventPayload(e, context));
-        await WriteAsync(MessageType.Paths, new PathsPayload(_api.Parser.ToPaths(e).ToList(), context));
+        await WriteAsync(MessageType.Paths, new PathsPayload(_api.EventParser.ToPaths(e).ToList(), context));
     }
     
-    private readonly IList<(MessageType type, object payload)> backlog = new List<(MessageType type, object payload)>();
+    private readonly IList<(MessageType type, object payload)> _backlog = new List<(MessageType type, object payload)>();
     
-    private async Task WriteAsync(MessageType type, object payload)
+    public async Task WriteAsync(MessageType type, object payload)
     {
-        backlog.Add((type, payload));
+        _backlog.Add((type, payload));
         
         var message = new WebSocketMessage(type, payload);
         foreach (var client in _clients.Where(x => x.IsOpen && x.IsAccepted && x.IsAvailable))

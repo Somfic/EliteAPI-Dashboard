@@ -1,7 +1,10 @@
 ﻿namespace EliteAPI.Server.WebSocket;
 
 public enum MessageType {
+    Authentication,
     Handshake,
     Paths,
-    Event
+    Event,
+    Error,
+    Backlog
 }
