@@ -1,36 +1,24 @@
 <script lang="ts">
-    import { Paths } from "../api/paths";
-
-    import { flip } from "svelte/animate";
+    import type { Paths } from "../api/paths";
     export let events: Paths[];
-
-    function parse(json: string) {
-        if (json == null || json == "") return "";
-
-        try {
-            return JSON.parse(json);
-        } catch (e) {
-            return json;
-        }
-    }
 </script>
 
 <div class="events">
     {#each events as event (event.id)}
-        <div class="event" animate:flip={{ duration: 300 }}>
-            <p class="title">{JSON.parse(event.paths.find((x) => x.Path.endsWith("Event")).Value)}</p>
+        <div class="event">
+            <p class="title">[{event.id}] {event.event}</p>
             <div class="paths">
-                {#each event.paths.map((x) => ({ path: x.Path, value: parse(x.Value), parts: x.Path.split(".") })) as path}
+                {#each event.paths as path}
                     <div class="path">
                         <div class="path-segments">
-                            {#each path.parts as segment, index}
+                            {#each path.Parts as segment, index}
                                 <div class="segment">{segment}</div>
-                                {#if index < path.parts.length - 1}
+                                {#if index < path.Parts.length - 1}
                                     <div class="separator">.</div>
                                 {/if}
                             {/each}
                         </div>
-                        <div class={"value type-" + typeof path.value}>{path.value}</div>
+                        <div class={"value type-" + path.ValueType}>{path.Value}</div>
                     </div>
                 {/each}
             </div>

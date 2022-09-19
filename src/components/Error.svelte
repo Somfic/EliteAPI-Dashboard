@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Exception } from "../api/error";
+    import type { Exception } from "../api/error";
 
     export let error: Exception;
 </script>

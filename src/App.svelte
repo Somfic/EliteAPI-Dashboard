@@ -12,7 +12,13 @@
 {#if $error != undefined}
     <Error error={$error} />
 {:else if $isConnected}
-    <Events events={$events} />
+    {#if $events.length == 0}
+        <div class="connection-prompt">
+            <h1>Loading</h1>
+        </div>
+    {:else}
+        <Events events={$events} />
+    {/if}
 {:else}
     <div class="connection-prompt">
         <h1>Connecting</h1>
@@ -21,4 +27,10 @@
 
 <style lang="scss">
     @import "./styles/theme";
+
+    .connection-prompt {
+        flex-grow: 1;
+        align-items: center;
+        justify-content: center;
+    }
 </style>

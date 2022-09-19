@@ -42,15 +42,23 @@ export function connect() {
                 break;
 
             case "Paths":
-                let paths = data.Payload as Paths;
-                paths.id = id++;
-                events.set([paths, ...get(events)]);
+                let rawPaths = data.Payload as Paths;
+                let paths = parsePaths(rawPaths);
+
+                events.update((items) => {
+                    items.unshift(paths);
+                    return items;
+                });
+
                 break;
 
             case "Backlog":
-                let backlog = data.Payload.filter((x: any) => x.paths) as Paths[];
-                backlog.forEach((paths) => (paths.id = id++));
-                backlog.reverse();
+                let rawBacklog = data.Payload.filter((x: any) => x.paths) as Paths[];
+                let backlog = [];
+
+                rawBacklog.reverse();
+                rawBacklog.forEach((rawPath) => backlog.push(parsePaths(rawPath)));
+
                 events.set([...backlog, ...get(events)]);
                 break;
 
@@ -70,4 +78,22 @@ export function connect() {
             connect();
         }, 1000);
     };
+}
+
+function parsePaths(raw: Paths): Paths {
+    let paths = raw;
+
+    paths.timestamp = new Date();
+
+    paths.event = JSON.parse(paths.paths.find((x) => x.Path.endsWith("Event")).Value);
+
+    paths.paths.forEach((path) => {
+        path.Parts = path.Path.split(".");
+        path.Value = path.Value == null || path.Value == "" ? "" : JSON.parse(path.Value);
+        path.ValueType = typeof path.Value;
+    });
+
+    paths.id = id++;
+
+    return paths;
 }
