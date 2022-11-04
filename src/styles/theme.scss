@@ -1,14 +1,8 @@
-$background: black;
-$background-light: rgb(29, 29, 31);
-$background-dark: #151515;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
 
-$foreground: white;
-$foreground-muted: gray;
-
-$border: #3d3d3d;
-$accent: orange;
-$error: rgb(219, 70, 70);
-
-$string: rgb(70, 125, 219);
-$number: rgb(70, 219, 70);
-$boolean: rgb(219, 70, 70);
+$background: #111015;
+$foreground: #E2E2E2;
+$muted: #858585;
+$accent: #FE990B;
+$backdrop: #27272C;
+$font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;

@@ -1,69 +1,73 @@
 {
-    "$schema": "../node_modules/@tauri-apps/cli/schema.json",
-    "build": {
-        "beforeBuildCommand": "npm run build",
-        "beforeDevCommand": "npm run dev",
-        "devPath": "http://localhost:8080",
-        "distDir": "../public"
-    },
-    "package": {
-        "productName": "Dashboard",
-        "version": "0.1.0"
-    },
-    "tauri": {
-        "allowlist": {
-            "all": true
-        },
-        "bundle": {
-            "active": true,
-            "category": "DeveloperTool",
-            "copyright": "",
-            "deb": {
-                "depends": []
-            },
-            "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
-            "identifier": "com.somfic.eliteapi",
-            "longDescription": "",
-            "macOS": {
-                "entitlements": null,
-                "exceptionDomain": "",
-                "frameworks": [],
-                "providerShortName": null,
-                "signingIdentity": null
-            },
-            "resources": [],
-            "shortDescription": "",
-            "targets": "all",
-            "windows": {
-                "certificateThumbprint": null,
-                "digestAlgorithm": "sha256",
-                "timestampUrl": ""
-            },
-            "externalBin": ["bin/eliteapi/eliteapi"]
-        },
-        "allowlist": {
-            "shell": {
-                "sidecar": true,
-                "scope": [{ "name": "bin/eliteapi/eliteapi", "sidecar": true }]
-            }
-        },
-        "security": {
-            "csp": null
-        },
-        "updater": {
-            "active": false
-        },
-        "windows": [
-            {
-                "fullscreen": false,
-                "alwaysOnTop": true,
-                "height": 600,
-                "resizable": true,
-                "title": "EliteAPI",
-                "width": 800,
-                "minWidth": 800,
-                "minHeight": 600
-            }
-        ]
-    }
+	"$schema": "../node_modules/@tauri-apps/cli/schema.json",
+	"build": {
+		"beforeBuildCommand": "npm run build",
+		"beforeDevCommand": "npm run dev",
+		"devPath": "http://localhost:5173",
+		"distDir": "../build"
+	},
+	"package": {
+		"productName": "EliteAPI",
+		"version": "3.0.0"
+	},
+	"tauri": {
+		"bundle": {
+			"active": true,
+			"category": "DeveloperTool",
+			"copyright": "",
+			"deb": {
+				"depends": []
+			},
+			"icon": [
+				"icons/32x32.png",
+				"icons/128x128.png",
+				"icons/128x128@2x.png",
+				"icons/icon.icns",
+				"icons/icon.ico"
+			],
+			"identifier": "com.somfic.eliteapi",
+			"longDescription": "",
+			"macOS": {
+				"entitlements": null,
+				"exceptionDomain": "",
+				"frameworks": [],
+				"providerShortName": null,
+				"signingIdentity": null
+			},
+			"resources": [],
+			"shortDescription": "",
+			"targets": "all",
+			"windows": {
+				"certificateThumbprint": null,
+				"digestAlgorithm": "sha256",
+				"timestampUrl": ""
+			},
+			"externalBin": ["bin/eliteapi/eliteapi"]
+		},
+		"allowlist": {
+			"shell": {
+				"sidecar": true,
+				"scope": [{ "name": "bin/eliteapi/eliteapi", "sidecar": true }]
+			}
+		},
+		"security": {
+			"csp": null
+		},
+		"updater": {
+			"active": false
+		},
+		"windows": [
+			{
+				"fullscreen": false,
+				"alwaysOnTop": false,
+				"height": 600,
+				"resizable": true,
+				"title": "EliteAPI",
+				"width": 600,
+				"minWidth": 600,
+				"minHeight": 600,
+				"theme": "Dark"
+			}
+		]
+	}
 }
