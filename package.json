@@ -38,6 +38,7 @@
   "dependencies": {
     "@tauri-apps/api": "^1.0.2",
     "download-github-release": "^0.3.2",
+    "fuzzysort": "^2.0.1",
     "sirv-cli": "^2.0.0"
   }
 }

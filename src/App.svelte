@@ -1,8 +1,9 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { connect, isConnected, error, events } from "./api/websocket";
+    import { connect, isConnected, error, events, variables } from "./api/websocket";
     import Error from "./components/Error.svelte";
     import Events from "./components/Events.svelte";
+    import Variables from "./components/Variables.svelte";
 
     onMount(() => {
         connect();
@@ -17,7 +18,8 @@
             <h1>Loading</h1>
         </div>
     {:else}
-        <Events events={$events} />
+        <!-- <Events events={$events} /> -->
+        <Variables variables={$variables} />
     {/if}
 {:else}
     <div class="connection-prompt">

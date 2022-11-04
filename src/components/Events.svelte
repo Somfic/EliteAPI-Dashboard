@@ -6,7 +6,7 @@
 <div class="events">
     {#each events as event (event.id)}
         <div class="event">
-            <p class="title">[{event.id}] {event.event}</p>
+            <p class="title">{event.event}</p>
             <div class="paths">
                 {#each event.paths as path}
                     <div class="path">

@@ -1,6 +1,6 @@
 import { get, Writable, writable } from "svelte/store";
 import type { Exception } from "./error";
-import type { Paths } from "./paths";
+import type { Path, Paths } from "./paths";
 
 const port = 51555;
 let socket: WebSocket | null = null;
@@ -8,6 +8,7 @@ let socket: WebSocket | null = null;
 export let isConnected = writable(false);
 export let error: Writable<Exception | undefined> = writable(undefined);
 export let events: Writable<Paths[]> = writable([]);
+export let variables: Writable<Path[]> = writable([]);
 
 export function send(type: string, payload: any) {
     if (!isConnected) {
@@ -50,6 +51,8 @@ export function connect() {
                     return items;
                 });
 
+                setVariables(paths.paths);
+
                 break;
 
             case "Backlog":
@@ -57,7 +60,11 @@ export function connect() {
                 let backlog = [];
 
                 rawBacklog.reverse();
-                rawBacklog.forEach((rawPath) => backlog.push(parsePaths(rawPath)));
+                rawBacklog.forEach((rawPath) => {
+                    var paths = parsePaths(rawPath);
+                    setVariables(paths.paths);
+                    backlog.push(paths);
+                });
 
                 events.set([...backlog, ...get(events)]);
                 break;
@@ -96,4 +103,21 @@ function parsePaths(raw: Paths): Paths {
     paths.id = id++;
 
     return paths;
+}
+
+function setVariables(vars: Path[]) {
+    variables.update((items) => {
+        vars.forEach((variable) => {
+            let existing = items.find((x) => x.Path == variable.Path);
+
+            if (existing) {
+                existing.Value = variable.Value;
+                existing.ValueType = variable.ValueType;
+            } else {
+                items.push(variable);
+            }
+        });
+
+        return items;
+    });
 }
